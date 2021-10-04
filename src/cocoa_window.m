@@ -900,93 +900,107 @@ int _glfwPlatformCreateWindow(_GLFWwindow* window,
                               const _GLFWctxconfig* ctxconfig,
                               const _GLFWfbconfig* fbconfig)
 {
-    @autoreleasepool {
+	__block int result = GLFW_TRUE;
+	dispatch_sync(dispatch_get_main_queue(), ^{
+		@autoreleasepool {
 
-    if (!createNativeWindow(window, wndconfig, fbconfig))
-        return GLFW_FALSE;
+			if (!createNativeWindow(window, wndconfig, fbconfig)) {
+				result = GLFW_FALSE;
+				return;
+			}
 
-    if (ctxconfig->client != GLFW_NO_API)
-    {
-        if (ctxconfig->source == GLFW_NATIVE_CONTEXT_API)
-        {
-            if (!_glfwInitNSGL())
-                return GLFW_FALSE;
-            if (!_glfwCreateContextNSGL(window, ctxconfig, fbconfig))
-                return GLFW_FALSE;
-        }
-        else if (ctxconfig->source == GLFW_EGL_CONTEXT_API)
-        {
-            // EGL implementation on macOS use CALayer* EGLNativeWindowType so we
-            // need to get the layer for EGL window surface creation.
-            [window->ns.view setWantsLayer:YES];
-            window->ns.layer = [window->ns.view layer];
+			if (ctxconfig->client != GLFW_NO_API) {
+				if (ctxconfig->source == GLFW_NATIVE_CONTEXT_API) {
+					if (!_glfwInitNSGL()) {
+						result = GLFW_FALSE;
+						return;
+					}
+					if (!_glfwCreateContextNSGL(window, ctxconfig, fbconfig)) {
+						result = GLFW_FALSE;
+						return;
+					}
+				} else if (ctxconfig->source == GLFW_EGL_CONTEXT_API) {
+					// EGL implementation on macOS use CALayer* EGLNativeWindowType so we
+					// need to get the layer for EGL window surface creation.
+					[window->ns.view setWantsLayer:YES];
+					window->ns.layer = [window->ns.view layer];
 
-            if (!_glfwInitEGL())
-                return GLFW_FALSE;
-            if (!_glfwCreateContextEGL(window, ctxconfig, fbconfig))
-                return GLFW_FALSE;
-        }
-        else if (ctxconfig->source == GLFW_OSMESA_CONTEXT_API)
-        {
-            if (!_glfwInitOSMesa())
-                return GLFW_FALSE;
-            if (!_glfwCreateContextOSMesa(window, ctxconfig, fbconfig))
-                return GLFW_FALSE;
-        }
-    }
+					if (!_glfwInitEGL()) {
+						result = GLFW_FALSE;
+						return;
+					}
+					if (!_glfwCreateContextEGL(window, ctxconfig, fbconfig)) {
+						result = GLFW_FALSE;
+						return;
+					}
+				} else if (ctxconfig->source == GLFW_OSMESA_CONTEXT_API) {
+					if (!_glfwInitOSMesa()) {
+						result = GLFW_FALSE;
+						return;
+					}
+					if (!_glfwCreateContextOSMesa(window, ctxconfig, fbconfig)) {
+						result = GLFW_FALSE;
+						return;
+					}
+				}
+			}
 
-    if (window->monitor)
-    {
-        _glfwPlatformShowWindow(window);
-        _glfwPlatformFocusWindow(window);
-        acquireMonitor(window);
-    }
+			if (window->monitor) {
+				_glfwPlatformShowWindow(window);
+				_glfwPlatformFocusWindow(window);
+				acquireMonitor(window);
+			}
 
-    return GLFW_TRUE;
-
-    } // autoreleasepool
+			result = GLFW_TRUE;
+		} // autoreleasepool
+	});
+	return result;
 }
 
 void _glfwPlatformDestroyWindow(_GLFWwindow* window)
 {
-    @autoreleasepool {
+	dispatch_sync(dispatch_get_main_queue(), ^{
+		@autoreleasepool {
 
-    if (_glfw.ns.disabledCursorWindow == window)
-        _glfw.ns.disabledCursorWindow = NULL;
+			if (_glfw.ns.disabledCursorWindow == window)
+				_glfw.ns.disabledCursorWindow = NULL;
 
-    [window->ns.object orderOut:nil];
+			[window->ns.object orderOut:nil];
 
-    if (window->monitor)
-        releaseMonitor(window);
+			if (window->monitor)
+				releaseMonitor(window);
 
-    if (window->context.destroy)
-        window->context.destroy(window);
+			if (window->context.destroy)
+				window->context.destroy(window);
 
-    [window->ns.object setDelegate:nil];
-    [window->ns.delegate release];
-    window->ns.delegate = nil;
+			[window->ns.object setDelegate:nil];
+			[window->ns.delegate release];
+			window->ns.delegate = nil;
 
-    [window->ns.view release];
-    window->ns.view = nil;
+			[window->ns.view release];
+			window->ns.view = nil;
 
-    [window->ns.object close];
-    window->ns.object = nil;
+			[window->ns.object close];
+			window->ns.object = nil;
 
-    // HACK: Allow Cocoa to catch up before returning
-    _glfwPlatformPollEvents();
+			// HACK: Allow Cocoa to catch up before returning
+			_glfwPlatformPollEvents();
 
-    } // autoreleasepool
+		} // autoreleasepool
+	});
 }
 
 void _glfwPlatformSetWindowTitle(_GLFWwindow* window, const char* title)
 {
-    @autoreleasepool {
-    NSString* string = @(title);
-    [window->ns.object setTitle:string];
-    // HACK: Set the miniwindow title explicitly as setTitle: doesn't update it
-    //       if the window lacks NSWindowStyleMaskTitled
-    [window->ns.object setMiniwindowTitle:string];
-    } // autoreleasepool
+	dispatch_sync(dispatch_get_main_queue(), ^{
+		@autoreleasepool {
+			NSString *string = @(title);
+			[window->ns.object setTitle:string];
+			// HACK: Set the miniwindow title explicitly as setTitle: doesn't update it
+			//       if the window lacks NSWindowStyleMaskTitled
+			[window->ns.object setMiniwindowTitle:string];
+		} // autoreleasepool
+	});
 }
 
 void _glfwPlatformSetWindowIcon(_GLFWwindow* window,
@@ -1013,14 +1027,16 @@ void _glfwPlatformGetWindowPos(_GLFWwindow* window, int* xpos, int* ypos)
 
 void _glfwPlatformSetWindowPos(_GLFWwindow* window, int x, int y)
 {
-    @autoreleasepool {
+	dispatch_sync(dispatch_get_main_queue(), ^{
+		@autoreleasepool {
 
-    const NSRect contentRect = [window->ns.view frame];
-    const NSRect dummyRect = NSMakeRect(x, _glfwTransformYNS(y + contentRect.size.height - 1), 0, 0);
-    const NSRect frameRect = [window->ns.object frameRectForContentRect:dummyRect];
-    [window->ns.object setFrameOrigin:frameRect.origin];
+			const NSRect contentRect = [window->ns.view frame];
+			const NSRect dummyRect = NSMakeRect(x, _glfwTransformYNS(y + contentRect.size.height - 1), 0, 0);
+			const NSRect frameRect = [window->ns.object frameRectForContentRect:dummyRect];
+			[window->ns.object setFrameOrigin:frameRect.origin];
 
-    } // autoreleasepool
+		} // autoreleasepool
+	});
 }
 
 void _glfwPlatformGetWindowSize(_GLFWwindow* window, int* width, int* height)
@@ -1039,24 +1055,23 @@ void _glfwPlatformGetWindowSize(_GLFWwindow* window, int* width, int* height)
 
 void _glfwPlatformSetWindowSize(_GLFWwindow* window, int width, int height)
 {
-    @autoreleasepool {
+	dispatch_sync(dispatch_get_main_queue(), ^{
+		@autoreleasepool {
 
-    if (window->monitor)
-    {
-        if (window->monitor->window == window)
-            acquireMonitor(window);
-    }
-    else
-    {
-        NSRect contentRect =
-            [window->ns.object contentRectForFrameRect:[window->ns.object frame]];
-        contentRect.origin.y += contentRect.size.height - height;
-        contentRect.size = NSMakeSize(width, height);
-        [window->ns.object setFrame:[window->ns.object frameRectForContentRect:contentRect]
-                            display:YES];
-    }
+			if (window->monitor) {
+				if (window->monitor->window == window)
+					acquireMonitor(window);
+			} else {
+				NSRect contentRect =
+						[window->ns.object contentRectForFrameRect:[window->ns.object frame]];
+				contentRect.origin.y += contentRect.size.height - height;
+				contentRect.size = NSMakeSize(width, height);
+				[window->ns.object setFrame:[window->ns.object frameRectForContentRect:contentRect]
+									display:YES];
+			}
 
-    } // autoreleasepool
+		} // autoreleasepool
+	});
 }
 
 void _glfwPlatformSetWindowSizeLimits(_GLFWwindow* window,
@@ -1144,19 +1159,23 @@ void _glfwPlatformGetWindowContentScale(_GLFWwindow* window,
 
 void _glfwPlatformIconifyWindow(_GLFWwindow* window)
 {
-    @autoreleasepool {
-    [window->ns.object miniaturize:nil];
-    } // autoreleasepool
+	dispatch_sync(dispatch_get_main_queue(), ^{
+		@autoreleasepool {
+			[window->ns.object miniaturize:nil];
+		} // autoreleasepool
+	});
 }
 
 void _glfwPlatformRestoreWindow(_GLFWwindow* window)
 {
-    @autoreleasepool {
-    if ([window->ns.object isMiniaturized])
-        [window->ns.object deminiaturize:nil];
-    else if ([window->ns.object isZoomed])
-        [window->ns.object zoom:nil];
-    } // autoreleasepool
+	dispatch_sync(dispatch_get_main_queue(), ^{
+		@autoreleasepool {
+			if ([window->ns.object isMiniaturized])
+				[window->ns.object deminiaturize:nil];
+			else if ([window->ns.object isZoomed])
+				[window->ns.object zoom:nil];
+		} // autoreleasepool
+	});
 }
 
 void _glfwPlatformMaximizeWindow(_GLFWwindow* window)
@@ -1169,9 +1188,11 @@ void _glfwPlatformMaximizeWindow(_GLFWwindow* window)
 
 void _glfwPlatformShowWindow(_GLFWwindow* window)
 {
-    @autoreleasepool {
-    [window->ns.object orderFront:nil];
-    } // autoreleasepool
+	dispatch_sync(dispatch_get_main_queue(), ^{
+		@autoreleasepool {
+			[window->ns.object orderFront:nil];
+		} // autoreleasepool
+	});
 }
 
 void _glfwPlatformHideWindow(_GLFWwindow* window)
@@ -1190,14 +1211,16 @@ void _glfwPlatformRequestWindowAttention(_GLFWwindow* window)
 
 void _glfwPlatformFocusWindow(_GLFWwindow* window)
 {
-    @autoreleasepool {
-    // Make us the active application
-    // HACK: This is here to prevent applications using only hidden windows from
-    //       being activated, but should probably not be done every time any
-    //       window is shown
-    [NSApp activateIgnoringOtherApps:YES];
-    [window->ns.object makeKeyAndOrderFront:nil];
-    } // autoreleasepool
+	dispatch_sync(dispatch_get_main_queue(), ^{
+		@autoreleasepool {
+			// Make us the active application
+			// HACK: This is here to prevent applications using only hidden windows from
+			//       being activated, but should probably not be done every time any
+			//       window is shown
+			[NSApp activateIgnoringOtherApps:YES];
+			[window->ns.object makeKeyAndOrderFront:nil];
+		} // autoreleasepool
+	});
 }
 
 void _glfwPlatformSetWindowMonitor(_GLFWwindow* window,
@@ -1405,21 +1428,39 @@ GLFWbool _glfwPlatformRawMouseMotionSupported(void)
 
 void _glfwPlatformPollEvents(void)
 {
-    @autoreleasepool {
+	if (NSThread.isMainThread) {
+		@autoreleasepool {
 
-    for (;;)
-    {
-        NSEvent* event = [NSApp nextEventMatchingMask:NSEventMaskAny
-                                            untilDate:[NSDate distantPast]
-                                               inMode:NSDefaultRunLoopMode
-                                              dequeue:YES];
-        if (event == nil)
-            break;
+			for (;;) {
+				NSEvent *event = [NSApp nextEventMatchingMask:NSEventMaskAny
+													untilDate:[NSDate distantPast]
+													   inMode:NSDefaultRunLoopMode
+													  dequeue:YES];
+				if (event == nil)
+					break;
 
-        [NSApp sendEvent:event];
-    }
+				[NSApp sendEvent:event];
+			}
 
-    } // autoreleasepool
+		} // autoreleasepool
+	} else {
+		dispatch_sync(dispatch_get_main_queue(), ^{
+			@autoreleasepool {
+
+				for (;;) {
+					NSEvent *event = [NSApp nextEventMatchingMask:NSEventMaskAny
+														untilDate:[NSDate distantPast]
+														   inMode:NSDefaultRunLoopMode
+														  dequeue:YES];
+					if (event == nil)
+						break;
+
+					[NSApp sendEvent:event];
+				}
+
+			} // autoreleasepool
+		});
+	}
 }
 
 void _glfwPlatformWaitEvents(void)
@@ -1493,46 +1534,47 @@ void _glfwPlatformGetCursorPos(_GLFWwindow* window, double* xpos, double* ypos)
 
 void _glfwPlatformSetCursorPos(_GLFWwindow* window, double x, double y)
 {
-    @autoreleasepool {
+	dispatch_sync(dispatch_get_main_queue(), ^{
+		@autoreleasepool {
 
-    updateCursorImage(window);
+			updateCursorImage(window);
 
-    const NSRect contentRect = [window->ns.view frame];
-    // NOTE: The returned location uses base 0,1 not 0,0
-    const NSPoint pos = [window->ns.object mouseLocationOutsideOfEventStream];
+			const NSRect contentRect = [window->ns.view frame];
+			// NOTE: The returned location uses base 0,1 not 0,0
+			const NSPoint pos = [window->ns.object mouseLocationOutsideOfEventStream];
 
-    window->ns.cursorWarpDeltaX += x - pos.x;
-    window->ns.cursorWarpDeltaY += y - contentRect.size.height + pos.y;
+			window->ns.cursorWarpDeltaX += x - pos.x;
+			window->ns.cursorWarpDeltaY += y - contentRect.size.height + pos.y;
 
-    if (window->monitor)
-    {
-        CGDisplayMoveCursorToPoint(window->monitor->ns.displayID,
-                                   CGPointMake(x, y));
-    }
-    else
-    {
-        const NSRect localRect = NSMakeRect(x, contentRect.size.height - y - 1, 0, 0);
-        const NSRect globalRect = [window->ns.object convertRectToScreen:localRect];
-        const NSPoint globalPoint = globalRect.origin;
+			if (window->monitor) {
+				CGDisplayMoveCursorToPoint(window->monitor->ns.displayID,
+										   CGPointMake(x, y));
+			} else {
+				const NSRect localRect = NSMakeRect(x, contentRect.size.height - y - 1, 0, 0);
+				const NSRect globalRect = [window->ns.object convertRectToScreen:localRect];
+				const NSPoint globalPoint = globalRect.origin;
 
-        CGWarpMouseCursorPosition(CGPointMake(globalPoint.x,
-                                              _glfwTransformYNS(globalPoint.y)));
-    }
+				CGWarpMouseCursorPosition(CGPointMake(globalPoint.x,
+													  _glfwTransformYNS(globalPoint.y)));
+			}
 
-    // HACK: Calling this right after setting the cursor position prevents macOS
-    //       from freezing the cursor for a fraction of a second afterwards
-    if (window->cursorMode != GLFW_CURSOR_DISABLED)
-        CGAssociateMouseAndMouseCursorPosition(true);
+			// HACK: Calling this right after setting the cursor position prevents macOS
+			//       from freezing the cursor for a fraction of a second afterwards
+			if (window->cursorMode != GLFW_CURSOR_DISABLED)
+				CGAssociateMouseAndMouseCursorPosition(true);
 
-    } // autoreleasepool
+		} // autoreleasepool
+	});
 }
 
 void _glfwPlatformSetCursorMode(_GLFWwindow* window, int mode)
 {
-    @autoreleasepool {
-    if (_glfwPlatformWindowFocused(window))
-        updateCursorMode(window);
-    } // autoreleasepool
+	dispatch_sync(dispatch_get_main_queue(), ^{
+		@autoreleasepool {
+			if (_glfwPlatformWindowFocused(window))
+				updateCursorMode(window);
+		} // autoreleasepool
+	});
 }
 
 const char* _glfwPlatformGetScancodeName(int scancode)
