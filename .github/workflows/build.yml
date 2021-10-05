@@ -3,6 +3,7 @@ on:
     pull_request:
     push:
         branches: [ ci, master, latest, 3.3-stable ]
+    workflow_dispatch:
 permissions:
     statuses: write
     contents: read
@@ -29,7 +30,11 @@ jobs:
             - name: Configure shared library
               run: cmake -S . -B build-shared -D BUILD_SHARED_LIBS=ON
             - name: Build shared library
-              run: cmake --build build-shared --parallel
+              run: cmake --build build-shared --parallel                
+            - uses: actions/upload-artifact@v2
+              with:
+                name: glfw-shared-linux-x11
+                path: build-shared/src/libglfw.so
 
     build-linux-wayland-clang:
         name: Wayland (Linux, Clang)
@@ -53,6 +58,10 @@ jobs:
               run: cmake -S . -B build-shared -D GLFW_USE_WAYLAND=ON -D BUILD_SHARED_LIBS=ON
             - name: Build shared library
               run: cmake --build build-shared --parallel
+            - uses: actions/upload-artifact@v2
+              with:
+                name: glfw-shared-linux-wayland
+                path: build-shared/src/libglfw.so
 
     build-linux-null-clang:
         name: Null (Linux, Clang)
@@ -76,6 +85,10 @@ jobs:
               run: cmake -S . -B build-shared -D GLFW_USE_OSMESA=ON -D BUILD_SHARED_LIBS=ON
             - name: Build shared library
               run: cmake --build build-shared --parallel
+            - uses: actions/upload-artifact@v2
+              with:
+                name: glfw-shared-linux-null
+                path: build-shared/src/libglfw.so
 
     build-macos-cocoa-clang:
         name: Cocoa (macOS, Clang)
@@ -95,6 +108,11 @@ jobs:
               run: cmake -S . -B build-shared -D BUILD_SHARED_LIBS=ON
             - name: Build shared library
               run: cmake --build build-shared --parallel
+            - uses: actions/upload-artifact@v2
+              with:
+                name: glfw-shared-macos
+                path: build-shared/src/libglfw.dylib
+                
 
     build-windows-win32-vs2019:
         name: Win32 (Windows, VS2019)
@@ -113,4 +131,8 @@ jobs:
               run: cmake -S . -B build-shared -G "Visual Studio 16 2019" -D BUILD_SHARED_LIBS=ON
             - name: Build shared library
               run: cmake --build build-shared --parallel
+            - uses: actions/upload-artifact@v2
+              with:
+                name: glfw-shared-windows
+                path: build-shared/src/glfw.dll
 
