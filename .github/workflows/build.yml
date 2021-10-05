@@ -28,7 +28,7 @@ jobs:
               run: cmake --build build-static --parallel
 
             - name: Configure shared library
-              run: cmake -S . -B build-shared -D BUILD_SHARED_LIBS=ON
+              run: cmake -S . -B build-shared -D BUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release
             - name: Build shared library
               run: cmake --build build-shared --parallel                
             - uses: actions/upload-artifact@v2
@@ -55,7 +55,7 @@ jobs:
               run: cmake --build build-static --parallel
 
             - name: Configure shared library
-              run: cmake -S . -B build-shared -D GLFW_USE_WAYLAND=ON -D BUILD_SHARED_LIBS=ON
+              run: cmake -S . -B build-shared -D GLFW_USE_WAYLAND=ON -D BUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release
             - name: Build shared library
               run: cmake --build build-shared --parallel
             - uses: actions/upload-artifact@v2
@@ -82,7 +82,7 @@ jobs:
               run: cmake --build build-static --parallel
 
             - name: Configure shared library
-              run: cmake -S . -B build-shared -D GLFW_USE_OSMESA=ON -D BUILD_SHARED_LIBS=ON
+              run: cmake -S . -B build-shared -D GLFW_USE_OSMESA=ON -D BUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release
             - name: Build shared library
               run: cmake --build build-shared --parallel
             - uses: actions/upload-artifact@v2
@@ -105,7 +105,7 @@ jobs:
               run: cmake --build build-static --parallel
 
             - name: Configure shared library
-              run: cmake -S . -B build-shared -D BUILD_SHARED_LIBS=ON
+              run: cmake -S . -B build-shared -D BUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release
             - name: Build shared library
               run: cmake --build build-shared --parallel
             - uses: actions/upload-artifact@v2
@@ -128,11 +128,11 @@ jobs:
               run: cmake --build build-static --parallel
 
             - name: Configure shared library
-              run: cmake -S . -B build-shared -G "Visual Studio 16 2019" -D BUILD_SHARED_LIBS=ON
+              run: cmake -S . -B build-shared -G "Visual Studio 16 2019" -D BUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release
             - name: Build shared library
               run: cmake --build build-shared --parallel
             - uses: actions/upload-artifact@v2
               with:
                 name: glfw-shared-windows
-                path: build-shared/src/glfw.dll
+                path: build-shared/src/Release/glfw3.dll
 
