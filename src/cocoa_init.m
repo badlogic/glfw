@@ -620,8 +620,10 @@ int _glfwInitCocoa(void)
 
 			CGEventSourceSetLocalEventsSuppressionInterval(_glfw.ns.eventSource, 0.0);
 
-			if (!initializeTIS())
-				return GLFW_FALSE;
+			if (!initializeTIS()) {
+				result = GLFW_FALSE;
+				return;
+			}
 
 			_glfwPollMonitorsCocoa();
 

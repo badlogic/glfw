@@ -961,7 +961,7 @@ int _glfwCreateWindowCocoa(_GLFWwindow* window,
             result = GLFW_TRUE;
 
         } // autoreleasepool
-    }
+    });
     return result;
 }
 
