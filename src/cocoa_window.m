@@ -1084,19 +1084,21 @@ void _glfwSetWindowSizeLimitsCocoa(_GLFWwindow* window,
                                    int minwidth, int minheight,
                                    int maxwidth, int maxheight)
 {
-    @autoreleasepool {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        @autoreleasepool {
 
-    if (minwidth == GLFW_DONT_CARE || minheight == GLFW_DONT_CARE)
-        [window->ns.object setContentMinSize:NSMakeSize(0, 0)];
-    else
-        [window->ns.object setContentMinSize:NSMakeSize(minwidth, minheight)];
+        if (minwidth == GLFW_DONT_CARE || minheight == GLFW_DONT_CARE)
+            [window->ns.object setContentMinSize:NSMakeSize(0, 0)];
+        else
+            [window->ns.object setContentMinSize:NSMakeSize(minwidth, minheight)];
 
-    if (maxwidth == GLFW_DONT_CARE || maxheight == GLFW_DONT_CARE)
-        [window->ns.object setContentMaxSize:NSMakeSize(DBL_MAX, DBL_MAX)];
-    else
-        [window->ns.object setContentMaxSize:NSMakeSize(maxwidth, maxheight)];
+        if (maxwidth == GLFW_DONT_CARE || maxheight == GLFW_DONT_CARE)
+            [window->ns.object setContentMaxSize:NSMakeSize(DBL_MAX, DBL_MAX)];
+        else
+            [window->ns.object setContentMaxSize:NSMakeSize(maxwidth, maxheight)];
 
-    } // autoreleasepool
+        } // autoreleasepool
+    });
 }
 
 void _glfwSetWindowAspectRatioCocoa(_GLFWwindow* window, int numer, int denom)
