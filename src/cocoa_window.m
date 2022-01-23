@@ -1188,10 +1188,12 @@ void _glfwRestoreWindowCocoa(_GLFWwindow* window)
 
 void _glfwMaximizeWindowCocoa(_GLFWwindow* window)
 {
-    @autoreleasepool {
-    if (![window->ns.object isZoomed])
-        [window->ns.object zoom:nil];
-    } // autoreleasepool
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        @autoreleasepool {
+            if (![window->ns.object isZoomed])
+                [window->ns.object zoom:nil];
+        } // autoreleasepool
+    });
 }
 
 void _glfwShowWindowCocoa(_GLFWwindow* window)
@@ -1205,16 +1207,20 @@ void _glfwShowWindowCocoa(_GLFWwindow* window)
 
 void _glfwHideWindowCocoa(_GLFWwindow* window)
 {
-    @autoreleasepool {
-    [window->ns.object orderOut:nil];
-    } // autoreleasepool
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        @autoreleasepool {
+            [window->ns.object orderOut:nil];
+        } // autoreleasepool
+    });
 }
 
 void _glfwRequestWindowAttentionCocoa(_GLFWwindow* window)
 {
-    @autoreleasepool {
-    [NSApp requestUserAttention:NSInformationalRequest];
-    } // autoreleasepool
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        @autoreleasepool {
+            [NSApp requestUserAttention:NSInformationalRequest];
+        } // autoreleasepool
+    });
 }
 
 void _glfwFocusWindowCocoa(_GLFWwindow* window)
@@ -1237,91 +1243,83 @@ void _glfwSetWindowMonitorCocoa(_GLFWwindow* window,
                                 int width, int height,
                                 int refreshRate)
 {
-    @autoreleasepool {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        @autoreleasepool {
 
-    if (window->monitor == monitor)
-    {
-        if (monitor)
-        {
-            if (monitor->window == window)
+            if (window->monitor == monitor) {
+                if (monitor) {
+                    if (monitor->window == window)
+                        acquireMonitor(window);
+                } else {
+                    const NSRect contentRect =
+                            NSMakeRect(xpos, _glfwTransformYCocoa(ypos + height - 1), width, height);
+                    const NSRect frameRect =
+                            [window->ns.object frameRectForContentRect:contentRect
+                                                             styleMask:getStyleMask(window)];
+
+                    [window->ns.object setFrame:frameRect display:YES];
+                }
+
+                return;
+            }
+
+            if (window->monitor)
+                releaseMonitor(window);
+
+            _glfwInputWindowMonitor(window, monitor);
+
+            // HACK: Allow the state cached in Cocoa to catch up to reality
+            // TODO: Solve this in a less terrible way
+            _glfwPollEventsCocoa();
+
+            const NSUInteger styleMask = getStyleMask(window);
+            [window->ns.object setStyleMask:styleMask];
+            // HACK: Changing the style mask can cause the first responder to be cleared
+            [window->ns.object makeFirstResponder:window->ns.view];
+
+            if (window->monitor) {
+                [window->ns.object setLevel:NSMainMenuWindowLevel + 1];
+                [window->ns.object setHasShadow:NO];
+
                 acquireMonitor(window);
-        }
-        else
-        {
-            const NSRect contentRect =
-                NSMakeRect(xpos, _glfwTransformYCocoa(ypos + height - 1), width, height);
-            const NSRect frameRect =
-                [window->ns.object frameRectForContentRect:contentRect
-                                                 styleMask:getStyleMask(window)];
+            } else {
+                NSRect contentRect = NSMakeRect(xpos, _glfwTransformYCocoa(ypos + height - 1),
+                                                width, height);
+                NSRect frameRect = [window->ns.object frameRectForContentRect:contentRect
+                                                                    styleMask:styleMask];
+                [window->ns.object setFrame:frameRect display:YES];
 
-            [window->ns.object setFrame:frameRect display:YES];
-        }
+                if (window->numer != GLFW_DONT_CARE &&
+                    window->denom != GLFW_DONT_CARE) {
+                    [window->ns.object setContentAspectRatio:NSMakeSize(window->numer,
+                                                                        window->denom)];
+                }
 
-        return;
-    }
+                if (window->minwidth != GLFW_DONT_CARE &&
+                    window->minheight != GLFW_DONT_CARE) {
+                    [window->ns.object setContentMinSize:NSMakeSize(window->minwidth,
+                                                                    window->minheight)];
+                }
 
-    if (window->monitor)
-        releaseMonitor(window);
+                if (window->maxwidth != GLFW_DONT_CARE &&
+                    window->maxheight != GLFW_DONT_CARE) {
+                    [window->ns.object setContentMaxSize:NSMakeSize(window->maxwidth,
+                                                                    window->maxheight)];
+                }
 
-    _glfwInputWindowMonitor(window, monitor);
+                if (window->floating)
+                    [window->ns.object setLevel:NSFloatingWindowLevel];
+                else
+                    [window->ns.object setLevel:NSNormalWindowLevel];
 
-    // HACK: Allow the state cached in Cocoa to catch up to reality
-    // TODO: Solve this in a less terrible way
-    _glfwPollEventsCocoa();
+                [window->ns.object setHasShadow:YES];
+                // HACK: Clearing NSWindowStyleMaskTitled resets and disables the window
+                //       title property but the miniwindow title property is unaffected
+                [window->ns.object setTitle:[window->ns.object miniwindowTitle]];
+            }
 
-    const NSUInteger styleMask = getStyleMask(window);
-    [window->ns.object setStyleMask:styleMask];
-    // HACK: Changing the style mask can cause the first responder to be cleared
-    [window->ns.object makeFirstResponder:window->ns.view];
-
-    if (window->monitor)
-    {
-        [window->ns.object setLevel:NSMainMenuWindowLevel + 1];
-        [window->ns.object setHasShadow:NO];
-
-        acquireMonitor(window);
-    }
-    else
-    {
-        NSRect contentRect = NSMakeRect(xpos, _glfwTransformYCocoa(ypos + height - 1),
-                                        width, height);
-        NSRect frameRect = [window->ns.object frameRectForContentRect:contentRect
-                                                            styleMask:styleMask];
-        [window->ns.object setFrame:frameRect display:YES];
-
-        if (window->numer != GLFW_DONT_CARE &&
-            window->denom != GLFW_DONT_CARE)
-        {
-            [window->ns.object setContentAspectRatio:NSMakeSize(window->numer,
-                                                                window->denom)];
-        }
-
-        if (window->minwidth != GLFW_DONT_CARE &&
-            window->minheight != GLFW_DONT_CARE)
-        {
-            [window->ns.object setContentMinSize:NSMakeSize(window->minwidth,
-                                                            window->minheight)];
-        }
-
-        if (window->maxwidth != GLFW_DONT_CARE &&
-            window->maxheight != GLFW_DONT_CARE)
-        {
-            [window->ns.object setContentMaxSize:NSMakeSize(window->maxwidth,
-                                                            window->maxheight)];
-        }
-
-        if (window->floating)
-            [window->ns.object setLevel:NSFloatingWindowLevel];
-        else
-            [window->ns.object setLevel:NSNormalWindowLevel];
-
-        [window->ns.object setHasShadow:YES];
-        // HACK: Clearing NSWindowStyleMaskTitled resets and disables the window
-        //       title property but the miniwindow title property is unaffected
-        [window->ns.object setTitle:[window->ns.object miniwindowTitle]];
-    }
-
-    } // autoreleasepool
+        } // autoreleasepool
+    });
 }
 
 int _glfwWindowFocusedCocoa(_GLFWwindow* window)
@@ -1379,34 +1377,42 @@ int _glfwFramebufferTransparentCocoa(_GLFWwindow* window)
 
 void _glfwSetWindowResizableCocoa(_GLFWwindow* window, GLFWbool enabled)
 {
-    @autoreleasepool {
-    [window->ns.object setStyleMask:getStyleMask(window)];
-    } // autoreleasepool
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        @autoreleasepool {
+            [window->ns.object setStyleMask:getStyleMask(window)];
+        } // autoreleasepool
+    });
 }
 
 void _glfwSetWindowDecoratedCocoa(_GLFWwindow* window, GLFWbool enabled)
 {
-    @autoreleasepool {
-    [window->ns.object setStyleMask:getStyleMask(window)];
-    [window->ns.object makeFirstResponder:window->ns.view];
-    } // autoreleasepool
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        @autoreleasepool {
+            [window->ns.object setStyleMask:getStyleMask(window)];
+            [window->ns.object makeFirstResponder:window->ns.view];
+        } // autoreleasepool
+    });
 }
 
 void _glfwSetWindowFloatingCocoa(_GLFWwindow* window, GLFWbool enabled)
 {
-    @autoreleasepool {
-    if (enabled)
-        [window->ns.object setLevel:NSFloatingWindowLevel];
-    else
-        [window->ns.object setLevel:NSNormalWindowLevel];
-    } // autoreleasepool
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        @autoreleasepool {
+            if (enabled)
+                [window->ns.object setLevel:NSFloatingWindowLevel];
+            else
+                [window->ns.object setLevel:NSNormalWindowLevel];
+        } // autoreleasepool
+    });
 }
 
 void _glfwSetWindowMousePassthroughCocoa(_GLFWwindow* window, GLFWbool enabled)
 {
-    @autoreleasepool {
-    [window->ns.object setIgnoresMouseEvents:enabled];
-    }
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        @autoreleasepool {
+            [window->ns.object setIgnoresMouseEvents:enabled];
+        }
+    });
 }
 
 float _glfwGetWindowOpacityCocoa(_GLFWwindow* window)
@@ -1418,9 +1424,11 @@ float _glfwGetWindowOpacityCocoa(_GLFWwindow* window)
 
 void _glfwSetWindowOpacityCocoa(_GLFWwindow* window, float opacity)
 {
-    @autoreleasepool {
-    [window->ns.object setAlphaValue:opacity];
-    } // autoreleasepool
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        @autoreleasepool {
+            [window->ns.object setAlphaValue:opacity];
+        } // autoreleasepool
+    });
 }
 
 void _glfwSetRawMouseMotionCocoa(_GLFWwindow *window, GLFWbool enabled)
